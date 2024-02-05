@@ -58,7 +58,7 @@ async function getInfoFromHtml(currentAmount: number): Promise<Event[]> {
         async function run() {
             try {
                 await client.connect();
-                const database = client.db('kaliberDB'); // Replace 'yourDatabaseName' with the actual database name
+                const database = client.db('kaliberDB');
                 const collection = database.collection('carddata');
 
                 // Insert data into the 'carddata' collection
