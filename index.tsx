@@ -1,16 +1,9 @@
 import express from 'express';
-import admin from 'firebase-admin';
 import axios from 'axios';
 import cheerio from 'cheerio';
 import { getDescription } from './getDescrption';
+import { MongoClient, ServerApiVersion } from 'mongodb';
 
-const serviceAccount = require('./kaliberapp-firebase-adminsdk-fkan8-9e20e8a1ff.json'); // Update with your service account key path
-
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-});
-
-const db = admin.firestore();
 
 const app = express();
 const port = 3000;
@@ -25,7 +18,18 @@ interface Event {
     joinedText: string;
 }
 
-export async function getInfoFromHtml(currentAmount: number): Promise<Event[]> {
+const uri = "mongodb+srv://emilAdmin:TzKPVGmLcElAvaKm@kaliberapp.xyuxg8k.mongodb.net/?retryWrites=true&w=majority";
+// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
+});
+
+
+async function getInfoFromHtml(currentAmount: number): Promise<Event[]> {
     try {
         const response = await axios.get('https://www.klbrlive.com/');
         const html = response.data;
@@ -46,23 +50,28 @@ export async function getInfoFromHtml(currentAmount: number): Promise<Event[]> {
             }
 
             const [, venue] = (dateAndVenue?.split('<br>') || ['', '']).map((part) => part.trim());
-            return { title, date, link: link || '', image: image || '', venue, joinedText };
+            return { title, date, link: link || '', image: image || '', venue, linkToInfo: linkToInfo || '', joinedText };
         }).get();
 
         const eventsData = await Promise.all(extractedEvents);
 
-        // Insert data into Firestore
-        const batch = db.batch();
-        const eventsCollection = db.collection('events'); // Replace 'events' with your desired Firestore collection name
+        async function run() {
+            try {
+                await client.connect();
+                const database = client.db('kaliberDB'); // Replace 'yourDatabaseName' with the actual database name
+                const collection = database.collection('carddata');
 
-        eventsData.forEach((event) => {
-            const docRef = eventsCollection.doc();
-            batch.set(docRef, event);
-        });
+                // Insert data into the 'carddata' collection
+                await collection.insertMany(eventsData);
 
-        await batch.commit();
+                console.log("Data inserted into MongoDB collection 'carddata' successfully!");
+            } finally {
+                await client.close();
+            }
+        }
+        run().catch(console.dir);
 
-        console.log('All data inserted into Firestore successfully.');
+        console.log(eventsData)
 
         return eventsData;
     } catch (error) {
@@ -70,8 +79,6 @@ export async function getInfoFromHtml(currentAmount: number): Promise<Event[]> {
         return [];
     }
 }
-
-// Call the function to get data from the HTML and insert it into Firestore
 getInfoFromHtml(100);
 
 app.get('/', (req, res) => {
