@@ -1,18 +1,18 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function (o, m, k, k2) {
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
     if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-        desc = { enumerable: true, get: function () { return m[k]; } };
+      desc = { enumerable: true, get: function() { return m[k]; } };
     }
     Object.defineProperty(o, k2, desc);
-}) : (function (o, m, k, k2) {
+}) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
 }));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function (o, v) {
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
     Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function (o, v) {
+}) : function(o, v) {
     o["default"] = v;
 });
 var __importStar = (this && this.__importStar) || function (mod) {
@@ -62,24 +62,18 @@ try {
                 const content = description$('.et_pb_column.et_pb_column_3_5.et_pb_column_1_tb_body.et_pb_css_mix_blend_mode_passthrough.et-last-child');
                 const extractedText = content
                     .map((index, element) => {
-                        const paragraphs = description$(element).find(".et_pb_module.et_pb_post_content.et_pb_post_content_0_tb_body p");
-                        const filteredParagraphs = paragraphs.filter((_, paragraph) => {
-                            const text = description$(paragraph).text().trim();
-                            return text !== '' && !text.includes('Biljettpris') || !text.includes('Åldersgräns');
-                        });
-                        const filteredParagraphsArray = filteredParagraphs.toArray();
-                        const processedTextArray = [];
-                        filteredParagraphsArray.forEach((paragraph) => {
-                            const processedText = description$(paragraph).text().replace(/\{"description":/g, '').replace(/"/g, '').replace(/}/g, '').trim();
-                            processedTextArray.push(processedText);
-                        });
-                        if (processedTextArray.length >= 2) {
-                            return processedTextArray[0];
+                    const paragraphs = description$(element).find(".et_pb_module.et_pb_post_content.et_pb_post_content_0_tb_body p");
+                    const processedTextArray = paragraphs.map((index, paragraph) => {
+                        const text = description$(paragraph).text().trim();
+                        if (text !== '' && !text.includes('Biljettpris') && !text.includes('Åldersgräns')) {
+                            return text.replace(/\{"description":/g, '').replace(/"/g, '').replace(/}/g, '').trim();
                         }
                         else {
-                            return "Ingen beskrivning";
+                            return null;
                         }
-                    })
+                    }).get().filter((text) => text !== null);
+                    return processedTextArray.join(' ');
+                })
                     .get();
                 joinedText = extractedText.join(' ');
             }
