@@ -52,7 +52,10 @@ try {
                 }
                 const descriptionHtml = await descriptionResponse.text();
                 const description$ = cheerio.load(descriptionHtml);
-
+                description$('strong').each((index: number, element: CheerioElement) => {
+                    // Append a space after the element
+                    description$(element).after(' ');
+                });
                 const content = description$('.et_pb_column.et_pb_column_3_5.et_pb_column_1_tb_body.et_pb_css_mix_blend_mode_passthrough.et-last-child');
                 const extractedText: string[] = content
                     .map((index: number, element: Element) => {
