@@ -3,9 +3,9 @@ import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js';
 import fetch from 'https://cdn.skypack.dev/node-fetch';
 
 console.log("Hello from Functions!");
+
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get('KLBRDB'));
-
-
+console.log(supabase)
 interface Event {
     title: string;
     date: string;
@@ -14,20 +14,9 @@ interface Event {
     venue: string;
     linkToInfo?: string;
     joinedText: string;
-    id?: number;
 }
 
-async function main() {
-    console.log("Deleting data");
-    const { data: deleteData, error: deleteError } = await supabase
-        .from('carddata')
-        .delete()
-        .neq('id', -1); // Delete all rows
-
-    if (deleteError) {
-        throw new Error(`Error deleting data: ${deleteError.message}`);
-    }
-
+try {
     const response = await fetch('https://www.klbrlive.com/');
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -38,9 +27,14 @@ async function main() {
     const eventElements = $('.et_pb_column.dem_column_grid_view').toArray();
     const events: Event[] = []; // Array to store events
 
-    console.log("Processing Elements");
+    console.log("deleting data");
+    const { data: deleteData, error: deleteError } = await supabase
+            .from('carddata')
+            .delete()
+            .gt('title', 0);
+    console.log("Procsessing Elements");
 
-    // Process each event element sequentially
+    // Process each event element
     for (let i = 0; i < eventElements.length; i++) {
         const element = eventElements[i];
         const ticketLinkElement = $(element).find('a:contains("Köp biljett")');
@@ -50,7 +44,7 @@ async function main() {
         const title = $(element).find('.et_pb_module_header.dem_grid_title a').text();
         const dateAndVenue = $(element).find('.dem_grid_style2_event_date_time_venue').html();
         const linkToInfo = $(element).find('a').attr('href');
-        let id = i + 1; // Generate a unique id for each event
+
         let joinedText = '';
 
         if (linkToInfo) {
@@ -63,12 +57,12 @@ async function main() {
                 const description$ = cheerio.load(descriptionHtml);
                 description$('strong').each((index: number, element: CheerioElement) => {
                     // Append a space after the element
-                    description$(element).after(' ');
+                    description$(element).after('  ');
                 });
                 const content = description$('.et_pb_column.et_pb_column_3_5.et_pb_column_1_tb_body.et_pb_css_mix_blend_mode_passthrough.et-last-child');
                 const extractedText: string[] = content
                     .map((index: number, element: Element) => {
-                        const paragraphs = description$(element).find(".et_pb_module.et_pb_post_content.et_pb_post_content_0_tb_body p");
+                        const paragraphs = description$(element).find(".et_pb_module.et_pb_post_content.et_pb_post_content_0_tb_body p")
 
                         const processedTextArray: string[] = paragraphs.map((index: number, paragraph: Element) => {
                             const text = description$(paragraph).text().trim();
@@ -92,28 +86,40 @@ async function main() {
         }
 
         const [, venue] = (dateAndVenue?.split('<br>') || [' ', ' ']).map((part) => part.trim());
+        console.log(events)
 
-        // Insert event into Supabase
-        console.log(`Processing event ${i + 1}`);
-        
-        const { error: insertError } = await supabase
-            .from('carddata')
-            .insert([{
-                id, // Assign the generated unique id
-                title,
-                date,
-                link: link || '',
-                image: image || '',
-                venue,
-                joinedText
-            }]);
-        if (insertError) {
-            throw new Error(`Error inserting event ${i + 1} into Supabase: ${insertError.message}`);
+        // Push event to the array
+        console.log('pusing to array')
+        events.push({ title, date, link: link || '', image: image || '', venue, linkToInfo: linkToInfo || '', joinedText });
+        console.log('push successfull')
+    }
+    console.log(`Total events found: ${events.length}`);
+    
+    
+    for (let i = 0; i < events.length; i++) {
+        try {
+            const event = events[i];
+            console.log(i)
+            const { error: insertError } = await supabase
+                .from('carddata')
+                .insert([{
+                    title: event.title,
+                    date: event.date,
+                    link: event.link,
+                    image: event.image,
+                    venue: event.venue,
+                    joinedText: event.joinedText
+                }]);
+            if (insertError) {
+                throw new Error(`Error inserting event ${i + 1} into Supabase ${insertError.message}`);
+            }
+            console.log(`Event ${i + 1} inserted into Supabase successfully.`);
+        } catch (error) {
+            console.error(error);
         }
-        console.log(`Event ${i + 1} inserted into Supabase successfully.`);
     }
 
     console.log('All events processed and inserted into Supabase successfully.');
+} catch (error) {
+    console.error('Error fetching data:', error);
 }
-
-main().catch(error => console.error(error));

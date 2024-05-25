@@ -22,13 +22,18 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const cheerio = __importStar(require("https://cdn.skypack.dev/cheerio"));
 const supabase_js_1 = require("https://cdn.skypack.dev/@supabase/supabase-js");
+const node_fetch_1 = __importDefault(require("https://cdn.skypack.dev/node-fetch"));
 console.log("Hello from Functions!");
 const supabase = (0, supabase_js_1.createClient)(Deno.env.get("SUPABASE_URL"), Deno.env.get('KLBRDB'));
+console.log(supabase);
 try {
-    const response = await fetch('https://www.klbrlive.com/');
+    const response = await (0, node_fetch_1.default)('https://www.klbrlive.com/');
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -36,10 +41,12 @@ try {
     const $ = cheerio.load(html);
     const eventElements = $('.et_pb_column.dem_column_grid_view').toArray();
     const events = []; // Array to store events
+    console.log("deleting data");
     const { data: deleteData, error: deleteError } = await supabase
         .from('carddata')
         .delete()
         .gt('title', 0);
+    console.log("Procsessing Elements");
     // Process each event element
     for (let i = 0; i < eventElements.length; i++) {
         const element = eventElements[i];
@@ -53,7 +60,7 @@ try {
         let joinedText = '';
         if (linkToInfo) {
             try {
-                const descriptionResponse = await fetch(linkToInfo);
+                const descriptionResponse = await (0, node_fetch_1.default)(linkToInfo);
                 if (!descriptionResponse.ok) {
                     throw new Error(`HTTP error! status: ${descriptionResponse.status}`);
                 }
@@ -61,7 +68,7 @@ try {
                 const description$ = cheerio.load(descriptionHtml);
                 description$('strong').each((index, element) => {
                     // Append a space after the element
-                    description$(element).after(' ');
+                    description$(element).after('  ');
                 });
                 const content = description$('.et_pb_column.et_pb_column_3_5.et_pb_column_1_tb_body.et_pb_css_mix_blend_mode_passthrough.et-last-child');
                 const extractedText = content
@@ -79,22 +86,25 @@ try {
                     return processedTextArray.join(' ');
                 })
                     .get();
-                joinedText = extractedText.join(' ');
+                const formattedExtractedText = extractedText.join(' ');
+                joinedText = formattedExtractedText;
             }
             catch (error) {
                 console.error('Error fetching description for event', i, ':', error);
             }
         }
-        const [, venue] = ((dateAndVenue === null || dateAndVenue === void 0 ? void 0 : dateAndVenue.split('<br>')) || ['', '']).map((part) => part.trim());
+        const [, venue] = ((dateAndVenue === null || dateAndVenue === void 0 ? void 0 : dateAndVenue.split('<br>')) || [' ', ' ']).map((part) => part.trim());
+        console.log(events);
         // Push event to the array
+        console.log('pusing to array');
         events.push({ title, date, link: link || '', image: image || '', venue, linkToInfo: linkToInfo || '', joinedText });
+        console.log('push successfull');
     }
     console.log(`Total events found: ${events.length}`);
-    // Insert events into Supabase sequentially
     for (let i = 0; i < events.length; i++) {
         try {
             const event = events[i];
-            // Insert event into Supabase
+            console.log(i);
             const { error: insertError } = await supabase
                 .from('carddata')
                 .insert([{
