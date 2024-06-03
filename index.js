@@ -39,17 +39,10 @@ const cheerio = __importStar(require("https://cdn.skypack.dev/cheerio"));
 const supabase_js_1 = require("https://cdn.skypack.dev/@supabase/supabase-js");
 const node_fetch_1 = __importDefault(require("https://cdn.skypack.dev/node-fetch"));
 console.log("Hello from Functions!");
-const supabase = (0, supabase_js_1.createClient)(Deno.env.get("SUPABASE_URL"), Deno.env.get('KLBRDB'));
+const supabase = (0, supabase_js_1.createClient)('https://segmbfxpvranvzxfzaao.supabase.co', Deno.env.get('KLBRDB'));
+console.log(supabase);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        console.log("Deleting data");
-        const { data: deleteData, error: deleteError } = yield supabase
-            .from('carddata')
-            .delete()
-            .neq('id', -1); // Delete all rows
-        if (deleteError) {
-            throw new Error(`Error deleting data: ${deleteError.message}`);
-        }
         const response = yield (0, node_fetch_1.default)('https://www.klbrlive.com/');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -58,8 +51,13 @@ function main() {
         const $ = cheerio.load(html);
         const eventElements = $('.et_pb_column.dem_column_grid_view').toArray();
         const events = []; // Array to store events
-        console.log("Processing Elements");
-        // Process each event element sequentially
+        console.log("deleting data");
+        const { data: deleteData, error: deleteError } = yield supabase
+            .from('carddata')
+            .delete()
+            .neq('id', -1); // Delete all rows
+        console.log("Procsessing Elements");
+        // Process each event element
         for (let i = 0; i < eventElements.length; i++) {
             const element = eventElements[i];
             const ticketLinkElement = $(element).find('a:contains("Köp biljett")');
@@ -69,7 +67,6 @@ function main() {
             const title = $(element).find('.et_pb_module_header.dem_grid_title a').text();
             const dateAndVenue = $(element).find('.dem_grid_style2_event_date_time_venue').html();
             const linkToInfo = $(element).find('a').attr('href');
-            let id = i + 1; // Generate a unique id for each event
             let joinedText = '';
             if (linkToInfo) {
                 try {
@@ -107,25 +104,27 @@ function main() {
                 }
             }
             const [, venue] = ((dateAndVenue === null || dateAndVenue === void 0 ? void 0 : dateAndVenue.split('<br>')) || [' ', ' ']).map((part) => part.trim());
-            // Insert event into Supabase
-            console.log(`Processing event ${i + 1}`);
-            const { error: insertError } = yield supabase
-                .from('carddata')
-                .insert([{
-                    id, // Assign the generated unique id
-                    title,
-                    date,
-                    link: link || '',
-                    image: image || '',
-                    venue,
-                    joinedText
-                }]);
-            if (insertError) {
-                throw new Error(`Error inserting event ${i + 1} into Supabase: ${insertError.message}`);
-            }
-            console.log(`Event ${i + 1} inserted into Supabase successfully.`);
+            let id = i + 1; // Generate a unique id for each event
+            // Add event to the events array
+            events.push({
+                id,
+                title,
+                date,
+                link: link || '',
+                image: image || '',
+                venue,
+                joinedText
+            });
+            console.log(`Event ${i + 1} processed.`);
         }
-        console.log('All events processed and inserted into Supabase successfully.');
+        // Insert all events into Supabase at once
+        const { error: insertError } = yield supabase
+            .from('carddata')
+            .insert(events);
+        if (insertError) {
+            throw new Error(`Error inserting events into Supabase: ${insertError.message}`);
+        }
+        console.log('All events inserted into Supabase successfully.');
     });
 }
 main().catch(error => console.error(error));
